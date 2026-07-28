@@ -9,7 +9,14 @@ const { renderMedia } = require("@remotion/renderer");
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public")); // Menyajikan frontend statis
+
+// Menggunakan absolute path agar tidak terjadi error saat deploy
+app.use(express.static(path.join(__dirname, "public"))); 
+
+// FIX: Secara eksplisit melayani rute "/" agar terhindar dari "Cannot GET /"
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 // API Endpoint untuk merender video
 app.post("/api/render", async (req, res) => {
@@ -33,12 +40,12 @@ app.post("/api/render", async (req, res) => {
 
     console.log(`[Node.js Engine] Start rendering: ${params.duration}s at ${resObj.w}x${resObj.h}`);
 
-    // 1. Bundle Remotion (kompilasi React ke Webpack)
+    // 1. Bundle Remotion
     const entryPoint = path.resolve(__dirname, "remotion/index.ts");
     const bundleLocation = await bundle({ entryPoint });
     console.log(`[Node.js Engine] Bundled at: ${bundleLocation}`);
 
-    // 2. Tentukan lokasi file MP4 sementara
+    // 2. Tentukan lokasi file MP4 sementara (menggunakan os.tmpdir agar aman di serverless)
     const uniqueId = `render_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     outputLocation = path.join(os.tmpdir(), `${uniqueId}.mp4`);
 
@@ -90,6 +97,5 @@ app.post("/api/render", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server berjalan di http://localhost:${PORT}`);
-  console.log(`👉 Buka link di atas melalui browser Anda.\n`);
+  console.log(`\n🚀 Server berjalan di http://localhost:${PORT}\n`);
 });
