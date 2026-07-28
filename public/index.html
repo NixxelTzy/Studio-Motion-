@@ -1,1 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Node.js RenderCraft Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { background: "#0a0a0a", surface: "#171717", primary: "#3b82f6" }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-background text-white h-screen flex flex-col font-sans overflow-hidden">
+  
+  <div class="flex flex-1 h-full">
+    <!-- SIDEBAR -->
+    <aside class="w-80 bg-surface border-r border-neutral-800 p-6 flex flex-col gap-6 overflow-y-auto">
+      <h1 class="text-xl font-bold tracking-wider">NODE<span class="text-primary">CRAFT</span></h1>
+      
+      <div class="space-y-4 flex-1 text-sm">
+        <label class="block">
+          <span class="text-gray-400 text-xs">TEMA (Adobe Stock Sync)</span>
+          <select id="theme" class="w-full bg-background border border-neutral-800 p-2.5 rounded-md mt-1 outline-none focus:border-primary">
+            <option value="Business">Business</option>
+            <option value="Education">Education</option>
+            <option value="Technology">Technology</option>
+          </select>
+        </label>
+        
+        <label class="block">
+          <span class="text-gray-400 text-xs">DURASI VIDEO (Detik)</span>
+          <select id="duration" class="w-full bg-background border border-neutral-800 p-2.5 rounded-md mt-1 outline-none focus:border-primary">
+            <option value="5">5 Detik</option>
+            <option value="10" selected>10 Detik</option>
+            <option value="15">15 Detik</option>
+            <option value="20">20 Detik</option>
+          </select>
+        </label>
 
+        <label class="block">
+          <div class="flex justify-between text-xs text-gray-400"><span>JUMLAH SCENE</span><span id="sceneCount" class="text-primary">3</span></div>
+          <input type="range" id="scenes" min="1" max="10" value="3" class="w-full mt-2 accent-primary" oninput="document.getElementById('sceneCount').innerText=this.value">
+        </label>
+
+        <label class="block">
+          <span class="text-gray-400 text-xs">GAYA VISUAL</span>
+          <select id="visualStyle" class="w-full bg-background border border-neutral-800 p-2.5 rounded-md mt-1 outline-none focus:border-primary">
+            <option value="Flat Vector">Flat Vector</option>
+            <option value="Grid Minimalist" selected>Grid Minimalist</option>
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-gray-400 text-xs">RESOLUSI (16:9)</span>
+          <select id="resolution" class="w-full bg-background border border-neutral-800 p-2.5 rounded-md mt-1 outline-none focus:border-primary">
+            <option value="1080">1K (1920x1080)</option>
+            <option value="1440">2K (2560x1440)</option>
+            <option value="2160">4K (3840x2160)</option>
+          </select>
+        </label>
+      </div>
+
+      <button id="renderBtn" class="w-full bg-primary hover:bg-blue-600 p-3 rounded-lg font-bold transition flex items-center justify-center gap-2">
+        RENDER & DOWNLOAD MP4
+      </button>
+    </aside>
+
+    <!-- MAIN AREA -->
+    <div class="flex-1 flex flex-col p-6 gap-6 overflow-hidden">
+      
+      <!-- VIDEO PLAYER -->
+      <div class="flex-1 bg-surface border border-neutral-800 rounded-xl flex flex-col shadow-xl">
+        <div class="p-3 border-b border-neutral-800 text-gray-400 text-sm">Hasil Render Node.js</div>
+        <div class="flex-1 p-6 flex items-center justify-center bg-black">
+          <video id="resultVideo" class="w-full max-w-4xl aspect-video rounded shadow-2xl hidden" controls autoplay loop></video>
+          <div id="loadingState" class="hidden flex-col items-center gap-4">
+            <div class="w-12 h-12 border-4 border-neutral-700 border-t-primary rounded-full animate-spin"></div>
+            <p class="text-gray-400 animate-pulse font-mono">Node.js sedang memproses FFmpeg...</p>
+          </div>
+          <div id="emptyState" class="text-neutral-600 font-mono">Belum ada video. Klik Render.</div>
+        </div>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="h-64 bg-surface border border-neutral-800 rounded-xl flex flex-col shrink-0">
+        <div class="p-3 border-b border-neutral-800 text-gray-400 text-sm">Inject Element (HTML/CSS)</div>
+        <textarea id="codeEditor" class="flex-1 bg-transparent p-4 font-mono text-sm text-green-400 outline-none resize-none" spellcheck="false">
+<div style="padding:40px; background:rgba(255,255,255,0.1); border-radius:20px; backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.2);">
+  <h1 style="font-size: 80px; margin:0; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Node.js Backend</h1>
+  <p style="font-size: 30px; margin-top:20px; opacity:0.8;">Blazing fast render engine.</p>
+</div></textarea>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('renderBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('renderBtn');
+      const videoEl = document.getElementById('resultVideo');
+      const emptyState = document.getElementById('emptyState');
+      const loadingState = document.getElementById('loadingState');
+
+      // Update UI Status
+      btn.disabled = true;
+      btn.innerText = "RENDERING...";
+      btn.classList.add("opacity-50", "cursor-not-allowed");
+      videoEl.classList.add('hidden');
+      emptyState.classList.add('hidden');
+      loadingState.classList.remove('hidden');
+      loadingState.classList.add('flex');
+
+      // Ambil Parameter
+      const payload = {
+        code: document.getElementById('codeEditor').value,
+        params: {
+          theme: document.getElementById('theme').value,
+          duration: Number(document.getElementById('duration').value),
+          scenes: Number(document.getElementById('scenes').value),
+          visualStyle: document.getElementById('visualStyle').value,
+          resolution: document.getElementById('resolution').value
+        }
+      };
+
+      try {
+        const response = await fetch('/api/render', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error(await response.text());
+
+        // Konversi buffer ke file yang bisa diputar
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        
+        // Putar Video
+        videoEl.src = url;
+        videoEl.classList.remove('hidden');
+
+        // Otomatis Download
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `NodeCraft_${payload.params.theme}_${payload.params.resolution}p.mp4`;
+        a.click();
+        
+      } catch (error) {
+        alert("Gagal merender: " + error.message);
+        emptyState.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "RENDER & DOWNLOAD MP4";
+        btn.classList.remove("opacity-50", "cursor-not-allowed");
+        loadingState.classList.add('hidden');
+        loadingState.classList.remove('flex');
+      }
+    });
+  </script>
+</body>
+</html>
